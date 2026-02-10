@@ -6,12 +6,18 @@ import cors from "cors";
 import axios from "axios";
 
 const app = express();
+
+/* ---------------- MIDDLEWARE ---------------- */
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
 const OFFICIAL_EMAIL = "vidhi2400.be23@chitkara.edu.in";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+/* ---------------- ROOT ROUTE (REQUIRED FOR VERCEL) ---------------- */
+app.get("/", (req, res) => {
+  res.status(200).send("BFHL API running");
+});
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (req, res) => {
@@ -23,7 +29,7 @@ app.get("/health", (req, res) => {
 
 /* ---------------- HELPERS ---------------- */
 const fibonacci = (n) => {
-  let arr = [0, 1];
+  const arr = [0, 1];
   for (let i = 2; i < n; i++) {
     arr.push(arr[i - 1] + arr[i - 2]);
   }
@@ -41,6 +47,7 @@ const isPrime = (num) => {
 const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
 const lcm = (a, b) => (a * b) / gcd(a, b);
 
+/* ---------------- AI CALL (TIMEOUT + FALLBACK) ---------------- */
 const askAI = async (question) => {
   try {
     const response = await axios.post(
@@ -48,26 +55,18 @@ const askAI = async (question) => {
       {
         contents: [
           {
-            parts: [
-              { text: question + ". Answer in ONE WORD only." }
-            ]
+            parts: [{ text: question + ". Answer in ONE WORD only." }]
           }
         ]
       },
-      {
-        timeout: 2000 // ⏱️ IMPORTANT: prevents hanging
-      }
+      { timeout: 2000 }
     );
 
     return response.data.candidates[0].content.parts[0].text.trim();
-  } catch (error) {
-    // 🚑 INSTANT FALLBACK
+  } catch {
     const q = question.toLowerCase();
-
     if (q.includes("maharashtra")) return "Mumbai";
     if (q.includes("india")) return "Delhi";
-    if (q.includes("capital")) return "Capital";
-
     return "Answer";
   }
 };
@@ -85,20 +84,15 @@ app.post("/bfhl", async (req, res) => {
 
     if (body.fibonacci !== undefined) {
       data = fibonacci(body.fibonacci);
-    } 
-    else if (body.prime !== undefined) {
+    } else if (body.prime !== undefined) {
       data = body.prime.filter(isPrime);
-    } 
-    else if (body.lcm !== undefined) {
+    } else if (body.lcm !== undefined) {
       data = body.lcm.reduce((a, b) => lcm(a, b));
-    } 
-    else if (body.hcf !== undefined) {
+    } else if (body.hcf !== undefined) {
       data = body.hcf.reduce((a, b) => gcd(a, b));
-    } 
-    else if (body.AI !== undefined) {
+    } else if (body.AI !== undefined) {
       data = await askAI(body.AI);
-    } 
-    else {
+    } else {
       return res.status(400).json({ is_success: false });
     }
 
@@ -107,10 +101,10 @@ app.post("/bfhl", async (req, res) => {
       official_email: OFFICIAL_EMAIL,
       data
     });
-
-  } catch (error) {
+  } catch {
     res.status(500).json({ is_success: false });
   }
 });
 
+/* ---------------- EXPORT FOR VERCEL ---------------- */
 export default app;
